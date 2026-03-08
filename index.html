@@ -3,35 +3,28 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Universal Code App Pro</title>
+    <title>Multi Code Pro</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
-    <script src="https://unpkg.com/html5-qrcode"></script>
+    <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
     <style>
-        :root { --primary: #2563eb; --secondary: #10b981; --danger: #ef4444; }
-        body { font-family: sans-serif; background: #f0f2f5; margin: 0; padding: 15px; display: flex; justify-content: center; }
-        .container { background: white; max-width: 500px; width: 100%; border-radius: 20px; box-shadow: 0 4px 20px rgba(0,0,0,0.1); overflow: hidden; }
+        :root { --primary: #2563eb; --secondary: #10b981; }
+        body { font-family: sans-serif; background: #f0f2f5; margin: 0; padding: 20px; display: flex; justify-content: center; }
+        .container { background: white; max-width: 450px; width: 100%; border-radius: 20px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); overflow: hidden; }
         .tabs { display: flex; background: #eee; }
-        .tab { flex: 1; padding: 15px; text-align: center; cursor: pointer; font-weight: bold; }
+        .tab { flex: 1; padding: 15px; text-align: center; cursor: pointer; font-weight: bold; transition: 0.3s; }
         .tab.active { background: white; color: var(--primary); border-bottom: 3px solid var(--primary); }
         .content { padding: 20px; display: none; }
         .content.active { display: block; }
-        
         input, select { width: 100%; padding: 12px; margin: 8px 0; border: 1px solid #ddd; border-radius: 8px; box-sizing: border-box; }
-        button { width: 100%; padding: 12px; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; margin-top: 10px; transition: 0.2s; }
+        button { width: 100%; padding: 12px; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; margin-top: 10px; }
         .btn-blue { background: var(--primary); color: white; }
         .btn-green { background: var(--secondary); color: white; }
-        .btn-outline { background: transparent; border: 1px solid #ccc; margin-top: 5px; font-size: 12px; }
-
-        /* 履歴リストのスタイル */
-        .history-list { margin-top: 20px; border-top: 1px solid #eee; padding-top: 10px; max-height: 300px; overflow-y: auto; }
-        .history-item { background: #f8fafc; padding: 10px; border-radius: 8px; margin-bottom: 8px; font-size: 14px; position: relative; border-left: 4px solid var(--primary); }
-        .history-item span { display: block; color: #666; font-size: 11px; }
-        .history-item a { color: var(--primary); word-break: break-all; }
-        .delete-btn { color: var(--danger); font-size: 11px; cursor: pointer; float: right; }
-
-        .output-area { margin-top: 20px; display: flex; flex-direction: column; align-items: center; min-height: 180px; justify-content: center; background: #fafafa; border-radius: 12px; }
-        #reader { width: 100%; border-radius: 12px; overflow: hidden; }
+        .output-area { margin-top: 20px; display: flex; flex-direction: column; align-items: center; min-height: 200px; justify-content: center; background: #fafafa; border-radius: 10px; padding: 10px; }
+        #barcode-svg { max-width: 100%; height: auto; }
+        #video-container { position: relative; width: 100%; aspect-ratio: 1; background: #000; border-radius: 12px; overflow: hidden; }
+        #preview { width: 100%; height: 100%; object-fit: cover; }
+        #result-text { background: #f8f9fa; padding: 15px; border-radius: 8px; margin-top: 10px; border: 1px dashed #ccc; }
     </style>
 </head>
 <body>
@@ -40,109 +33,154 @@
     <div class="tabs">
         <div id="tab-make" class="tab active" onclick="switchTab('make')">作成</div>
         <div id="tab-scan" class="tab" onclick="switchTab('scan')">読み取り</div>
-        <div id="tab-history" class="tab" onclick="switchTab('history')">履歴</div>
     </div>
 
     <div id="make" class="content active">
-        <select id="code-type"><option value="qr">QRコード</option><option value="barcode">バーコード</option></select>
-        <input type="text" id="main-input" placeholder="内容を入力" value="https://google.com">
-        <button class="btn-blue" onclick="generate()">生成 & 保存</button>
-        <div class="output-area"><div id="qr-out"></div><svg id="barcode-svg"></svg>
-            <button id="dl-btn" class="btn-green" style="display:none; width: 80%;" onclick="downloadCode()">画像を保存</button>
+        <label>コードの種類</label>
+        <select id="code-type" onchange="toggleInputs()">
+            <option value="qr">QRコード (URL/テキスト)</option>
+            <option value="barcode">バーコード (CODE128/数字等)</option>
+        </select>
+
+        <input type="text" id="main-input" placeholder="内容を入力してください" value="12345678">
+        
+        <div style="display: flex; gap: 10px;">
+            <input type="color" id="code-color" value="#000000" style="width: 60px;">
+            <button class="btn-blue" style="margin: 8px 0;" onclick="generate()">生成する</button>
+        </div>
+
+        <div class="output-area">
+            <div id="qr-out"></div>
+            <svg id="barcode-svg"></svg>
+            <button id="dl-btn" class="btn-green" style="display:none;" onclick="downloadCode()">画像を保存</button>
         </div>
     </div>
 
     <div id="scan" class="content">
-        <div id="reader"></div>
-        <div id="result-box" style="margin-top:10px; font-weight:bold; text-align:center;">スキャン待機中...</div>
-        <button class="btn-blue" id="scan-btn" onclick="startScanner()">スキャン開始</button>
-    </div>
-
-    <div id="history" class="content">
-        <div style="display:flex; justify-content: space-between; align-items: center;">
-            <h3>履歴一覧</h3>
-            <button class="btn-outline" style="width:auto;" onclick="clearHistory()">全削除</button>
-        </div>
-        <div id="history-list" class="history-list"></div>
+        <div id="video-container"><video id="preview" autoplay playsinline></video></div>
+        <div id="result-text">スキャン待機中...</div>
+        <button class="btn-blue" onclick="startScan()">カメラ起動</button>
+        <canvas id="canvas" style="display:none;"></canvas>
     </div>
 </div>
 
 <script>
-    let html5QrCode = null;
-    let historyData = JSON.parse(localStorage.getItem('code_history') || '[]');
-
+    // --- 1. 表示の切り替え系 ---
     function switchTab(tabId) {
         document.querySelectorAll('.content').forEach(c => c.classList.remove('active'));
         document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
         document.getElementById(tabId).classList.add('active');
         document.getElementById('tab-' + tabId).classList.add('active');
-        if (tabId === 'history') renderHistory();
-        if (tabId !== 'scan') stopScanner();
+        if(tabId !== 'scan') stopScan();
     }
 
-    // 履歴を保存する関数
-    function saveToHistory(text, type) {
-        const item = { text, type, date: new Date().toLocaleString(), id: Date.now() };
-        historyData.unshift(item); // 先頭に追加
-        localStorage.setItem('code_history', JSON.stringify(historyData));
+    function toggleInputs() {
+        document.getElementById("qr-out").innerHTML = "";
+        document.getElementById("barcode-svg").innerHTML = "";
+        document.getElementById("dl-btn").style.display = "none";
     }
 
-    // 履歴を表示する関数
-    function renderHistory() {
-        const list = document.getElementById("history-list");
-        list.innerHTML = historyData.length ? "" : "<p style='color:#999'>履歴はありません</p>";
-        historyData.forEach(item => {
-            const div = document.createElement("div");
-            div.className = "history-item";
-            const isUrl = item.text.startsWith('http');
-            div.innerHTML = `
-                <span onclick="deleteItem(${item.id})" class="delete-btn">削除</span>
-                <span>[${item.type}] ${item.date}</span>
-                ${isUrl ? `<a href="${item.text}" target="_blank">${item.text}</a>` : `<b>${item.text}</b>`}
-            `;
-            list.appendChild(div);
-        });
-    }
-
-    function deleteItem(id) {
-        historyData = historyData.filter(i => i.id !== id);
-        localStorage.setItem('code_history', JSON.stringify(historyData));
-        renderHistory();
-    }
-
-    function clearHistory() { if(confirm("全て削除しますか？")) { historyData = []; localStorage.clear(); renderHistory(); } }
-
-    // 生成・読取ロジック（履歴保存を連携）
+    // --- 2. 生成メイン ---
     function generate() {
         const type = document.getElementById("code-type").value;
         const val = document.getElementById("main-input").value;
-        if (!val) return;
+        const color = document.getElementById("code-color").value;
+        const dlBtn = document.getElementById("dl-btn");
+
+        if (!val) return alert("内容を入力してください");
+
         document.getElementById("qr-out").innerHTML = "";
-        document.getElementById("barcode-svg").innerHTML = "";
-        if (type === "qr") { new QRCode(document.getElementById("qr-out"), { text: val, width: 180, height: 180 }); }
-        else { JsBarcode("#barcode-svg", val, { format: "CODE128", width: 2, height: 60 }); }
-        document.getElementById("dl-btn").style.display = "block";
-        saveToHistory(val, type === "qr" ? "作成(QR)" : "作成(BC)");
+        const svg = document.getElementById("barcode-svg");
+        svg.innerHTML = "";
+
+        if (type === "qr") {
+            new QRCode(document.getElementById("qr-out"), {
+                text: val, width: 200, height: 200, colorDark: color, colorLight: "#ffffff", correctLevel: QRCode.CorrectLevel.H
+            });
+        } else {
+            JsBarcode("#barcode-svg", val, {
+                format: "CODE128", lineColor: color, width: 2, height: 80, displayValue: true, background: "#ffffff"
+            });
+        }
+        // 画像生成を待ってからボタンを表示
+        setTimeout(() => dlBtn.style.display = "block", 300);
     }
 
-    async function startScanner() {
-        html5QrCode = new Html5Qrcode("reader");
-        document.getElementById("scan-btn").style.display = "none";
-        await html5QrCode.start({ facingMode: "environment" }, { fps: 10, qrbox: 250 }, (text) => {
-            document.getElementById("result-box").innerHTML = `読取成功: <br>${text}`;
-            saveToHistory(text, "スキャン");
-            stopScanner(); // 一度止める
+    // --- 3. 【重要】修正した保存機能 ---
+    async function downloadCode() {
+        const type = document.getElementById("code-type").value;
+        const fileName = type === "qr" ? "qrcode.png" : "barcode.png";
+        let dataUrl = "";
+
+        try {
+            if (type === "qr") {
+                const qrImg = document.querySelector("#qr-out img");
+                if (!qrImg) return alert("QRコードがありません");
+                dataUrl = qrImg.src;
+            } else {
+                const svg = document.getElementById("barcode-svg");
+                if (!svg || svg.childNodes.length === 0) return alert("バーコードがありません");
+                dataUrl = await svgToPng(svg);
+            }
+
+            const link = document.createElement("a");
+            link.href = dataUrl;
+            link.download = fileName;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        } catch (e) {
+            alert("保存に失敗しました。ブラウザの設定を確認してください。");
+        }
+    }
+
+    function svgToPng(svgElement) {
+        return new Promise((resolve, reject) => {
+            const svgData = new XMLSerializer().serializeToString(svgElement);
+            const canvas = document.createElement("canvas");
+            const ctx = canvas.getContext("2d");
+            const img = new Image();
+            const rect = svgElement.getBoundingClientRect();
+
+            canvas.width = rect.width * 2;
+            canvas.height = rect.height * 2;
+            ctx.scale(2, 2);
+
+            img.onload = () => {
+                ctx.fillStyle = "#ffffff";
+                ctx.fillRect(0, 0, rect.width, rect.height);
+                ctx.drawImage(img, 0, 0, rect.width, rect.height);
+                resolve(canvas.toDataURL("image/png"));
+            };
+            img.onerror = reject;
+            img.src = "data:image/svg+xml;base64," + btoa(unescape(encodeURIComponent(svgData)));
         });
     }
 
-    function stopScanner() { 
-        if (html5QrCode && html5QrCode.isScanning) { 
-            html5QrCode.stop().then(() => { document.getElementById("scan-btn").style.display = "block"; }); 
-        } 
+    // --- 4. スキャン系 ---
+    let videoStream = null;
+    function startScan() {
+        const video = document.getElementById("preview");
+        navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } }).then(stream => {
+            videoStream = stream; video.srcObject = stream; requestAnimationFrame(tick);
+        }).catch(err => alert("カメラを起動できませんでした。HTTPS環境か確認してください。"));
     }
-
-    // （画像保存ロジックは前回同様のため省略可能ですが、内部に保持しています）
-    function downloadCode() { /* 前回のdownloadCode関数をここに配置 */ }
+    function tick() {
+        const video = document.getElementById("preview");
+        if (video.readyState === video.HAVE_ENOUGH_DATA) {
+            const canvas = document.getElementById("canvas");
+            const ctx = canvas.getContext("2d");
+            canvas.height = video.videoHeight; canvas.width = video.videoWidth;
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+            const code = jsQR(ctx.getImageData(0, 0, canvas.width, canvas.height).data, canvas.width, canvas.height);
+            if (code) {
+                document.getElementById("result-text").innerText = "読み取り結果: " + code.data;
+            }
+        }
+        if (videoStream) requestAnimationFrame(tick);
+    }
+    function stopScan() { if(videoStream) videoStream.getTracks().forEach(t => t.stop()); videoStream = null; }
 </script>
+
 </body>
 </html>
